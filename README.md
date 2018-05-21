@@ -8,6 +8,9 @@ This projet is fully covered by a CC-by-nc-sa licence wich allow you to modify t
 
 
 You have to mension the programmers below to share any project arising of this one: 
+
 -Erwan Bouvron
+
 -Sofiane Dion
+
 -Quentin Aoustin
