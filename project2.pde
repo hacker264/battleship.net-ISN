@@ -1,10 +1,19 @@
 
+
 //-------------------- déclaration de variable d'objets et import de librairie----------------------------------
 
 import processing.net.*;
 
+import ddf.minim.*;
+import ddf.minim.analysis.*;
+import ddf.minim.effects.*;
+import ddf.minim.signals.*;
+import ddf.minim.spi.*;
+import ddf.minim.ugens.*;
 
-//-----------------variable menu && network-----------------
+
+
+//-----------------variables menu && network-----------------
 Boolean isServer;      //define if server or client
 
 String serverIP = "";  //only used if client
@@ -33,7 +42,7 @@ int totalSinkPerso = 0;
 int totalSinkAdv = 0;
 
 
-//---------------variable grille && placement bateau--------
+//---------------variables grille && placement bateau--------
 int[][] grille_Adver;   
 int[][] grille_Perso; 
 String caract = "";
@@ -45,6 +54,7 @@ PImage img_bateau12;
 PImage img_bateau13;
 PImage img_bateau14;
 PImage background;
+
 
 String[] tableau_alphabet={"", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
 
@@ -64,6 +74,38 @@ boolean placement_bon = false;
 
 int k=0;
 
+//---------------variables animations && sons--------
+
+PImage[] flammes = new PImage[33];
+PImage[] explosions = new PImage[30];
+PImage Start;
+
+int i=0;
+int u=0;
+int animation=0;
+int StartMenu=0;
+int couleur=0;
+int response;
+int sound=0;
+
+boolean launch = false;
+
+Minim minim;
+AudioPlayer sound1;
+AudioPlayer sound2;
+AudioPlayer touche;
+
+//---------------variables déja joué--------
+String[] contenuServer;
+Table TableServer;
+Table TableClient;
+int coord_x = 0;
+int coord_y = 0;
+int cptClick=0;
+Boolean print = false;
+int turnPrint = 0;
+String thingsToPrint ="";
+
 
 
 //------------------------------Méthode principale-----------------------------------------
@@ -73,33 +115,88 @@ void setup() {
   smooth();
   noStroke();
   background(255);
+  frameRate(25);
   textAlign(CENTER); //Important pour moi je sais pas si vous l'utilisez vous ca simplifie la vie ;P
-  shipPlacementSetup();
+  // SetupTableClient();
+  SetupTableServer();
+
+
+  minim = new Minim(this);
+  sound1 = minim.loadFile("sound1.mp3");
+  sound2 = minim.loadFile("sound2.mp3");
 }
 
 void draw() {
-  if (menu == true) {
-    if (positionning == true) {  //passe à faux quand les 4 bateaux sont placés
-      positionningShipDraw(); //afficher les bateaux
-    } else {
-      menuDraw();  //setup quentin
-    }
-  } else if (totalSinkPerso == 4) {
-    looserLayout();
-  } else if (totalSinkAdv == 4) {
-    winnerLayout();
-  } else {
-    if (play == true) {
-      positionningShipPlay();
-    } else {
-      waitForAnAttack();
+  switch (sound) {
+  case 0 :
+    // sound1.play();
+    //sound2.cue(0);
+    break;
+  case 1 :
+    //sound2.play();
+    //sound1.cue(0);
+    break;
+  }
+  if (StartMenu==0) {
+    couleurMenu();
+  }
+  if (StartMenu==1) {
+    shipPlacementSetup();
+    StartMenu=2;
+  }
+  if (StartMenu==2) {
+    if (menu == true) {
+      if (positionning == true) {  //passe à faux quand les 4 bateaux sont placés
+        positionningShipDraw(); //afficher les bateaux
+      } else {
+        menuDraw();  //setup quentin
+      }
+    } else if (totalSinkPerso == 4) {
+      looserLayout();
+      stop();
+    } else if (totalSinkAdv == 4) {
+      winnerLayout();
+      stop();
+    } else { 
+      if (play == true) {
+        positionningShipPlay();
+        
+      } else {
+        waitForAnAttack();
+      }
+      if (print == true) {
+          if (turnPrint < 15) {
+            //afficher
+            fill(0);
+            rectMode(CENTER);
+            rect(450, 215, 900, 60);
+            rectMode(CORNER);
+            fill(200, 0, 0);
+            textSize(35);
+            text(thingsToPrint, 450, 225);
+            turnPrint++;
+          } else {
+            print = false;
+            turnPrint = 0;
+          }
+      }
     }
   }
 }
 
-
-
 void mousePressed() {
+  if (StartMenu==0) {
+    if ( ( (mouseX<width/2+100) && (mouseY<height/2+50) && (mouseX>width/2-100) && (mouseY>height/2-50) ) ) {
+      launch = true;
+      if (launch==true)
+      {
+        if (sound==0); 
+        {
+          StartMenu=1; // appuye sur le bouton "Jouer"
+        }
+      }
+    }
+  }
   if (menu) {
     if (positionning) {
       positionningShipMousePressed();
@@ -108,27 +205,31 @@ void mousePressed() {
     }
   } else {
     if (play) {
-      int response = trySendingAttack(mouseX, mouseY);
+      response = trySendingAttack(mouseX, mouseY);
       switch (response) {
       case 500:
-        //animationDejaJoue();
-        println("déja joué a cette position");
+        print = true;
+        thingsToPrint = "Déjà joué ici, recommencer svp.";
+        play =true;
         break;
       case 404:
         println("Tkt no soucis t'as dut missclick a coté des cases t'es pas doué c'est tout. ;)");
         play = true;
         break;
       case 0 : 
-        //animationManque();
         println("Pas de bateau adversaire ici.");
+        print = true;
+        thingsToPrint = "Dommage, manqué";
         break;
       case 1 : 
-        //animationTouche;();
         println("GG t'as touché un truc.");
+        print = true;
+        thingsToPrint = "Yes, quelque chose a été touché";
         break;
       case 2 : 
-        //animationCoulé();
         println("GG t'as coulé un truc.");
+        print = true;
+        thingsToPrint = "Bien joué, c'est coulé.";
         totalSinkAdv++;
         break;
       }
@@ -143,9 +244,6 @@ void keyPressed() {
     detectKeyboardInput();
   }
 }
-
-
-
 
 void winnerLayout() {
   fill(255);
@@ -163,52 +261,110 @@ void looserLayout() {
 }
 
 
+void SetupTableServer() {
+  TableServer = new Table(); // Créé un tableau
+
+  TableServer.clearRows(); //Efface tout ce qu'il y avait dans les lignes 
+
+  TableServer.addColumn("coordonnees x"); // Créé une colonne x
+  TableServer.addColumn("coordonnees y"); // Créé une colonne y
+
+  saveTable(TableServer, "data/TableServer.csv"); // Sauvegarde le tableau en .csv avec pour nom "TableServer"
+}
+
+void couleurMenu() { // Affiche l'écran titre
+  Start = loadImage("StartBackground.png");
+  image(Start, 0, 0);
+  fill(255-couleur, 0, 0+couleur); //Couleur du texte "Jouer" a l'écran titre
+  textSize(80);
+  text("Jouer", width/2, height/2);
+}
+
+void mouseMoved() // Change la couleur de "Jouer" quand on passe la souris dessus
+{
+  if ( ( (mouseX<width/2+100) && (mouseY<height/2+50) && (mouseX>width/2-100) && (mouseY>height/2-50) ) ) {
+    couleur=255;
+  } else {
+    couleur=0;
+  }
+}
+
+
 //---------------------Fonction perso pour le menu && network --------------------------------
 
 
 int trySendingAttack(int x, int y) {
   play = false;
+  println("\n\n\ntru sending attack");
   int intToReturn = 404;
   for (int i=0; i < 10; i++) {
     for (int j=0; j < 10; j++) {
       x = 40+(i+1)*largeurColonne;
       y = 60+(j+1)*hauteurRangee;
       if (mouseX > x && mouseX < x+largeurColonne && mouseY > y && mouseY< y+hauteurRangee) {
-        //if (!alreadyPlay(x,y)){ ---------------------------------------------------
-        if (isServer) {
-          s.write(i+","+j+"\n");
-          println("sending attack at x:"+i+"   y:"+j);
-          while (s.available() == null) {
-            delay(250);
+        if (!(AlreadyPlay(i, j))) { // Sauvegarde la position de l'attaque
+          if (isServer) {
+            s.write(i+","+j+"\n");
+            println("sending attack at x:"+i+"   y:"+j);
+            while (s.available() == null) {
+              delay(250);
+            }
+            c = s.available();
+          } else {
+            c.write(i+","+j+"\n");
+            println("sending attack at x:"+i+"   y:"+j);
+            while (c.available() <= 0) {
+              delay(250);
+            }
           }
-          c = s.available();
+          if (c != null) {
+            String input = c.readString(); 
+            println(input);
+            input = input.substring(0, input.indexOf("\n"));
+            println("The response is: "+input);
+            intToReturn = int(input);
+          }
         } else {
-          c.write(i+","+j+"\n");
-          println("sending attack at x:"+i+"   y:"+j);
-          while (c.available() <= 0) {
-            delay(250);                                                            //SOFIANE ici des commentaires pour toi :P
-          }                                                                        // Si possible integrer la verification de déja joué dans une fonction "alreadyPlayed()" 
-          //qui prend en parametre les coordonnées de la case et renvoie true si deja joué et false sinon
+          intToReturn = 500;
         }
-        if (c != null) {
-          String input = c.readString(); 
-          println(input);
-          input = input.substring(0, input.indexOf("\n"));
-          println("The response is: "+input);
-          intToReturn = int(input);
-        }
-        //}
-        //---------------------------------------------------------------------------------
-        //else {       //si déja attaqué a cette endroit
-        //  intToReturn = 500;
-        //}
       }
     }
   }
   return intToReturn;
 }
 
+Boolean AlreadyPlay(int i, int j) {
+  coord_x = i;
+  coord_y = j;
+  Boolean boolToReturn = false;
 
+  TableServer = loadTable("TableServer.csv", "header"); // On charge la Table
+  String[] lignes = loadStrings("TableServer.csv"); // On charge les lignes
+  for (int w=1; w <= cptClick; w++) { // Ecrit ce qu'il y a dans les lignes pour debug
+    println("\n\n\nligne n°"+w+":"+lignes[w]);
+
+    contenuServer=loadStrings("TableServer.csv"); // Charge ce qu'il y a dans les lignes
+    String alreadyPlay = lignes[w]; // Recupere ce qu'il y a dans les lignes
+    println("alreadyPlay="+alreadyPlay);
+    int[] XY = int(split(alreadyPlay, ","));
+    println("i,j="+i+","+j);
+    if (XY[0]==i && XY[1]==j) {// Censé comparé ce qu'il y a dans les lignes et la case sur laquel on appuie
+      println("déja joué ici");
+      boolToReturn = true;
+    } else {
+      println("pas encore joué");
+    }
+  }
+  TableServer = loadTable("TableServer.csv", "header"); // Charge la Table serveur
+
+  TableRow newRow = TableServer.addRow(); // Créé une ligne 
+  newRow.setInt("coordonnees x", coord_x); // dans la colonne x, inscrire x
+  newRow.setInt("coordonnees y", coord_y); // dans la colonne y, inscrire y
+
+  saveTable(TableServer, "data/TableServer.csv"); // sauvegarder
+  cptClick++; // Incrémenter à chaque click
+  return boolToReturn;
+}
 
 
 void waitForAnAttack() {
@@ -223,14 +379,14 @@ void waitForAnAttack() {
       while (c.available() <= 0) {
         delay(250);
       }
-    }
+    } 
     if (c!= null) {
       String input = c.readString(); 
       input = input.substring(0, input.indexOf("\n"));
       println(input);
       if (firstOKPast) {
         int coordinates[] = int(split(input, ','));
-        println("Attack receive at x:"+coordinates[0]+"   y:"+coordinates[1]);
+        println("\n\n\n\nAttack receive at x:"+coordinates[0]+"   y:"+coordinates[1]);
         int MTOrCToRespond = MTOrC(coordinates[0], coordinates[1]);
         if (isServer) {
           s.write(MTOrCToRespond+"\n");
@@ -379,7 +535,7 @@ void menuDraw() {
   case 0 :
     fill(0);
     textSize(15);
-    text("Vos placements de bateaux ont bien été enregistrés", 450, 225);
+    text("Vos placements de bateaux ont bien été enregistrés\nMerci de lancer d'abord le serveur.", 450, 225);
     textSize(30);
     text("Sélectionner celui qui vous correspond :", 450, 338);
     textSize(25);
@@ -595,6 +751,8 @@ void positionningShipPlay() {
 }
 
 void shipPlacementSetup() {
+  background(255);
+
   img_bateau11 = loadImage("bateau11.png");
   img_bateau12 = loadImage("bateau12.png");
   img_bateau13 = loadImage("bateau13.png");
@@ -603,9 +761,11 @@ void shipPlacementSetup() {
 
   tint(200, 200, 200, 200);
 
+  largeurColonne = (width/11)-30; //Initialisation des variables
+  hauteurRangee = (height/21)-10;
 
-  image(background, 92, 93, 508, 318);
-  image(background, 92, 543, 508, 318);
+  image(background, 40+largeurColonne, 60+hauteurRangee, largeurColonne*10, hauteurRangee*10);
+  image(background, 40+largeurColonne, 60+hauteurRangee+width/2, largeurColonne*10, hauteurRangee*10);
 
   fill(200, 0, 0);
   rect(0, (height/2)-5, width, 5); //Rectangle pour séparer les 2 grilles
@@ -627,8 +787,6 @@ void shipPlacementSetup() {
   // valeur cases
   textSize(15);
 
-  largeurColonne = (width/11)-30; //Initialisation des variables
-  hauteurRangee = (height/21)-10;
 
   for (int i=0; i < 10; i++) {                 //Doucle bloucle, pour la création du plateau, affactetiondes variable au cases, affichage des variables dans les cases, affichage des numéros au dessus (bande noire)
     for (int j=0; j < 10; j++) {
@@ -709,11 +867,14 @@ void caseOrdonnee(int i, float y) {
   text(lettre, 40+largeurColonne/2, y+hauteurRangee/1.5);
 }
 
-
-
-
-
 void positionningShipDraw() {
+
+  fill(255);
+  rect(700, 0, 200, 50);
+  fill(0);
+  textSize(20);
+  text("Musique suivante", 800, 25);
+
 
   for (int i=0; i < 10; i++) {  //Doucle bloucle, pour la création du plateau, affactetiondes variable au cases, affichage des variables dans les cases, affichage des numéros au dessus (bande noire)
     for (int j=0; j < 10; j++) {
@@ -751,6 +912,15 @@ void positionningShipDraw() {
 
 
 void positionningShipMousePressed() {
+
+  if ( ( (mouseX<width) && (mouseY<75) && (mouseX>700) && (mouseY>0) ) ) {
+    sound++;
+    println(sound);
+    if (sound>=2) {
+      sound=0;
+    }
+  }
+
 
   if (mouseX>725 && mouseX<725+largeurColonne && mouseY>560 && mouseY<560+hauteurRangee) {
     if (placement11==0) {
@@ -1295,4 +1465,9 @@ void placer14_4 (int i, int j)
   rect(649, 782+hauteurRangee, 4*largeurColonne, 5);
   rect(645, 777, 5, hauteurRangee+10);
   rect(649+4*largeurColonne, 777, 5, hauteurRangee+10);
+}
+
+void stop() {
+  minim.stop();
+  super.stop();
 }
